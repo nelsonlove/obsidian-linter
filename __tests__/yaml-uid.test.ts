@@ -284,6 +284,68 @@ ruleTest({
       },
     },
     {
+      testName: 'A colliding key earlier in the note cannot make a real id look unusable',
+      before: dedent`
+        ---
+        idXv2: some-unrelated-value
+        id.v2: 689ca1d9-f412-4a26-b798-98c52c9ed050
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        idXv2: some-unrelated-value
+        id.v2: 689ca1d9-f412-4a26-b798-98c52c9ed050
+        ---
+        # Title
+      `,
+      options: {
+        uidKey: 'id.v2',
+        replaceUnusableValues: true,
+        generateUid: fixedUid('11111111-1111-7111-8111-111111111111'),
+      },
+    },
+    {
+      testName: 'An anchored id is never replaced, so an alias elsewhere is not left dangling',
+      before: dedent`
+        ---
+        uid: &myid 689ca1d9-f412-4a26-b798-98c52c9ed050
+        other: *myid
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        uid: &myid 689ca1d9-f412-4a26-b798-98c52c9ed050
+        other: *myid
+        ---
+        # Title
+      `,
+      options: {
+        replaceUnusableValues: true,
+        generateUid: fixedUid('11111111-1111-7111-8111-111111111111'),
+      },
+    },
+    {
+      testName: 'A tagged id is never replaced',
+      before: dedent`
+        ---
+        uid: !!str 689ca1d9-f412-4a26-b798-98c52c9ed050
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        uid: !!str 689ca1d9-f412-4a26-b798-98c52c9ed050
+        ---
+        # Title
+      `,
+      options: {
+        replaceUnusableValues: true,
+        generateUid: fixedUid('11111111-1111-7111-8111-111111111111'),
+      },
+    },
+    {
       testName: 'A quoted id is recognised and left alone even with replacement on',
       before: dedent`
         ---
@@ -452,6 +514,16 @@ describe('yaml-uid', () => {
     expect(() => rule.apply('---\ncreated: 1965-01-01T00:00:00Z\n---\n# Title\n', {
       dateCreatedKey: 'created',
       uidKey: 'uid',
+      format: 'uuid-v7',
+      replaceUnusableValues: false,
+    })).not.toThrow();
+  });
+
+  it('does not throw out of apply when the configured key is corrupted to null', () => {
+    const rule = YamlUid.getRule();
+
+    expect(() => rule.apply('---\ntitle: A note\n---\n# Title\n', {
+      uidKey: null as unknown as string,
       format: 'uuid-v7',
       replaceUnusableValues: false,
     })).not.toThrow();
