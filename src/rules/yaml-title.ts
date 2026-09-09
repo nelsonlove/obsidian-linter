@@ -1,5 +1,5 @@
 import {Options, RuleType} from '../rules';
-import RuleBuilder, {ExampleBuilder, OptionBuilderBase, TextOptionBuilder, DropdownOptionBuilder} from './rule-builder';
+import RuleBuilder, {BooleanOptionBuilder, ExampleBuilder, OptionBuilderBase, TextOptionBuilder, DropdownOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
 import {escapeStringIfNecessaryAndPossible, formatYAML, initYAML, QuoteCharacter} from '../utils/yaml';
 import {ignoreListOfTypes, IgnoreTypes} from '../utils/ignore-types';
@@ -18,6 +18,20 @@ class YamlTitleOptions implements Options {
   titleKey?: string = 'title';
 
   mode?: YamlTitleModeValues = 'first-h1-or-filename-if-h1-missing';
+
+  preserveExistingTitle?: boolean = false;
+}
+
+/**
+ * Determines whether the text following `<title key>:` on the title line represents no value.
+ * An absent value, whitespace, and an explicitly empty string (`''` or `""`) all count as empty,
+ * since each leaves the note without a usable title.
+ * @param {string} rawValue The text between the title key's colon and the end of that line.
+ * @return {boolean} True when the existing title carries no usable value.
+ */
+function titleValueIsEmpty(rawValue: string): boolean {
+  const trimmedValue = rawValue.trim();
+  return trimmedValue === '' || trimmedValue === '\'\'' || trimmedValue === '""';
 }
 
 @RuleBuilder.register
@@ -51,9 +65,15 @@ export default class YamlTitle extends RuleBuilder<YamlTitleOptions> {
     title = escapeStringIfNecessaryAndPossible(title, options.defaultEscapeCharacter);
 
     return formatYAML(text, (text) => {
-      const title_match_str = `\n${options.titleKey}:.*\n`;
+      const title_match_str = `\n${options.titleKey}:(.*)\n`;
       const title_match = new RegExp(title_match_str);
-      if (title_match.test(text)) {
+      const existing_title = title_match.exec(text);
+      if (existing_title) {
+        // when preserving, an existing non-empty title is left exactly as the author wrote it
+        if (options.preserveExistingTitle && !titleValueIsEmpty(existing_title[1])) {
+          return text;
+        }
+
         text = text.replace(
             title_match,
             escapeDollarSigns(`\n${options.titleKey}: ${title}\n`),
@@ -154,6 +174,12 @@ export default class YamlTitle extends RuleBuilder<YamlTitleOptions> {
         nameKey: 'rules.yaml-title.title-key.name',
         descriptionKey: 'rules.yaml-title.title-key.description',
         optionsKey: 'titleKey',
+      }),
+      new BooleanOptionBuilder({
+        OptionsClass: YamlTitleOptions,
+        nameKey: 'rules.yaml-title.preserve-existing-title.name',
+        descriptionKey: 'rules.yaml-title.preserve-existing-title.description',
+        optionsKey: 'preserveExistingTitle',
       }),
       new DropdownOptionBuilder<YamlTitleOptions, YamlTitleModeValues>({
         OptionsClass: YamlTitleOptions,

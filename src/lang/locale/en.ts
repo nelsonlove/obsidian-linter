@@ -956,6 +956,10 @@ export default {
         'name': 'Title key',
         'description': 'Which YAML key to use for title',
       },
+      'preserve-existing-title': {
+        'name': 'Preserve existing title',
+        'description': 'Only set the title when it is missing or empty, leaving a title that is already present untouched. Note that the title will then no longer follow renames or heading changes.',
+      },
       'mode': {
         'name': 'Mode',
         'description': 'The method to use to get the title',

@@ -1257,6 +1257,7 @@ Inserts the title of the file into the YAML frontmatter. Gets the title based on
 | Name | Description | List Items | Default Value |
 | ---- | ----------- | ---------- | ------------- |
 | `Title key` | Which YAML key to use for title | N/A | `title` |
+| `Preserve existing title` | Only set the title when it is missing or empty, leaving a title that is already present untouched. Note that the title will then no longer follow renames or heading changes. | N/A | false |
 | `Mode` | The method to use to get the title | `first-h1-or-filename-if-h1-missing`: Uses the first H1 in the file or the filename of the file if there is not H1<br/><br/>`filename`: Uses the filename as the title<br/><br/>`first-h1`: Uses the first H1 in the file as the title | `first-h1-or-filename-if-h1-missing` |
 
 
