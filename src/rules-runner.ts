@@ -22,9 +22,6 @@ import {convertStringVersionOfEscapeCharactersToEscapeCharacters} from './utils/
 import {getTextInLanguage} from './lang/helpers';
 import CapitalizeHeadings from './rules/capitalize-headings';
 import YamlTitle from './rules/yaml-title';
-// imported so the rule registers itself; it has no special execution order and runs in the
-// generic rule loop like the other YAML rules
-import './rules/yaml-uid';
 import YamlTitleAlias from './rules/yaml-title-alias';
 import BlockquoteStyle from './rules/blockquote-style';
 import {IgnoreTypes, ignoreListOfTypes} from './utils/ignore-types';

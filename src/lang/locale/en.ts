@@ -990,6 +990,8 @@ export default {
     'first-h1': 'First H1',
     'first-h1-or-filename-if-h1-missing': 'First H1 or Filename if H1 is Missing',
     'filename': 'Filename',
+    'uuid-v7': 'UUIDv7',
+    'uuid-v4': 'UUIDv4',
     // settings-data.ts
     'never': 'Never',
     'after 5 seconds': 'After 5 seconds',
