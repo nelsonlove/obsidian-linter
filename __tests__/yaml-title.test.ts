@@ -387,6 +387,115 @@ ruleTest({
         # Escape \\[\\_\\]
       `,
     },
+    {
+      testName: 'When `preserveExistingTitle = true`, an existing title is left alone even though the H1 differs',
+      before: dedent`
+        ---
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a missing title is still added',
+      before: dedent`
+        ---
+        uid: 123
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        uid: 123
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a title key with no value is filled in',
+      before: dedent`
+        ---
+        title:
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, an explicitly empty title is filled in',
+      before: dedent`
+        ---
+        title: ""
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = false`, an existing title is still overwritten',
+      before: dedent`
+        ---
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: false,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a preserved title is not disturbed by a value needing escaping in the H1',
+      before: dedent`
+        ---
+        title: Plain title
+        ---
+        # Hello: world
+      `,
+      after: dedent`
+        ---
+        title: Plain title
+        ---
+        # Hello: world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
   ],
 });
 
