@@ -33,13 +33,16 @@ function unquote(value: string): string {
 }
 
 /**
- * A block or folded scalar's body lives on the following lines, which the single-line value read
- * cannot see. Such a value can never be judged, so it must never be treated as replaceable.
+ * True for a value this rule cannot evaluate from the key's own line alone. A block or folded
+ * scalar (`|`, `>`) keeps its body on the following lines. An anchor (`&`), an alias (`*`) or a tag
+ * (`!`) makes the value a YAML construct whose meaning is not the literal text, and an anchored id
+ * may be referenced elsewhere in the document. None of these can be judged here, so none may be
+ * replaced — replacing one destroys a real id and can leave the frontmatter invalid.
  * @param {string} value The raw value as it appears after the key's colon.
- * @return {boolean} True when the value continues on later lines in a form that cannot be read here.
+ * @return {boolean} True when the value cannot be judged from this line.
  */
-function isUnreadableScalar(value: string): boolean {
-  return /^[|>]/.test(value.trim());
+function isUnjudgeableValue(value: string): boolean {
+  return /^[|>&*!]/.test(value.trim());
 }
 
 export function isUsableUid(value: string | null): boolean {
@@ -161,36 +164,38 @@ export default class YamlUid extends RuleBuilder<YamlUidOptions> {
     text = initYAML(text);
 
     return formatYAML(text, (text) => {
-      // the key is user-configurable, so it must be escaped before it becomes a pattern: an
-      // unescaped `.` in a key like `meta.id` matches any character and the replace below would
-      // then rewrite a different field entirely
-      const uid_match_str = `\n${escapeRegExp(options.uidKey)}:.*\n`;
+      // a corrupted setting must not throw: that would abort this file's whole lint silently
+      const uidKey = typeof options.uidKey === 'string' && options.uidKey.trim() !== '' ? options.uidKey : 'uid';
+      // the key is user-configurable, so it must be escaped everywhere it becomes a pattern. An
+      // unescaped `.` in a key like `meta.id` matches any character, and the two regexes below must
+      // agree about which line is this note's id — if the read finds one line and the write another,
+      // the value judged is not the value replaced.
+      const escapedUidKey = escapeRegExp(uidKey);
+      const uid_match_str = `\n${escapedUidKey}:.*\n`;
       const uid_match = new RegExp(uid_match_str);
       const keyIsPresent = uid_match.test(text);
 
       if (keyIsPresent) {
         // read with allowNestedKey false so a same-named key nested under something else cannot be
         // mistaken for this note's own id
-        const existingValue = getYamlSectionValue(text, options.uidKey, false);
+        const existingValue = getYamlSectionValue(text, escapedUidKey, false);
         if (isUsableUid(existingValue)) {
           return text;
         }
 
         const valueIsEmpty = existingValue == null || existingValue.trim() === '';
-        // a value that cannot be read in full is never replaced, whatever the setting says: the
-        // body of a block scalar is on later lines, so replacing the key line alone would strand it
-        if (!valueIsEmpty && (!options.replaceUnusableValues || isUnreadableScalar(existingValue))) {
+        if (!valueIsEmpty && (!options.replaceUnusableValues || isUnjudgeableValue(existingValue))) {
           return text;
         }
       }
 
       const uid = this.buildUid(text, options);
       if (keyIsPresent) {
-        return text.replace(uid_match, escapeDollarSigns(`\n${options.uidKey}: ${uid}\n`));
+        return text.replace(uid_match, escapeDollarSigns(`\n${uidKey}: ${uid}\n`));
       }
 
       const yaml_end = text.indexOf('\n---');
-      return insert(text, yaml_end, `\n${options.uidKey}: ${uid}`);
+      return insert(text, yaml_end, `\n${uidKey}: ${uid}`);
     });
   }
   buildUid(yamlText: string, options: YamlUidOptions): string {
