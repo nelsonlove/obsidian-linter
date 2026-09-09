@@ -33,6 +33,7 @@ Each rule is its own set of logic and is designed to be run independently. This 
 - [yaml-timestamp](https://platers.github.io/obsidian-linter/settings/yaml-rules/#yaml-timestamp)
 - [yaml-title](https://platers.github.io/obsidian-linter/settings/yaml-rules/#yaml-title)
 - [yaml-title-alias](https://platers.github.io/obsidian-linter/settings/yaml-rules/#yaml-title-alias)
+- [yaml-uid](https://platers.github.io/obsidian-linter/settings/yaml-rules/#yaml-uid)
 
 ### Heading rules
 

@@ -914,6 +914,22 @@ export default {
       },
     },
     // yaml-title.ts
+    'yaml-uid': {
+      'name': 'YAML uid',
+      'description': 'Gives a note a stable unique id in its frontmatter. Only ever writes when the id is missing or empty, so an id that already exists is never regenerated.',
+      'uid-key': {
+        'name': 'Uid key',
+        'description': 'Which YAML key holds the id',
+      },
+      'format': {
+        'name': 'Format',
+        'description': 'The kind of id to generate for a note that does not have one',
+      },
+      'replace-unusable-values': {
+        'name': 'Replace unusable values',
+        'description': 'Also replace a value that is not a UUID of any version, such as a template placeholder left unexpanded. A well-formed UUID is never replaced whatever its version, so changing the format above does not rewrite existing ids.',
+      },
+    },
     'yaml-title': {
       'name': 'YAML title',
       'description': 'Inserts the title of the file into the YAML frontmatter. Gets the title based on the selected mode.',
