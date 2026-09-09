@@ -519,13 +519,22 @@ describe('yaml-uid', () => {
     })).not.toThrow();
   });
 
+  // every one of these was verified against the real YAML parser to lose the id, or to corrupt the
+  // note's other frontmatter, if it were written
   it.each([
     ['null', null],
     ['an empty string', ''],
     ['whitespace only', '   '],
-    ['a key containing a newline', 'a\nb'],
-    ['a key containing a colon', 'a:b'],
-  ])('writes nothing rather than guessing when the configured key is %s', (_label, badKey) => {
+    ['a newline', 'a\nb'],
+    ['a key/value colon', 'a: b'],
+    ['a comment marker', '#uid'],
+    ['a sequence marker', '- id'],
+    ['a flow sequence opener', '[uid'],
+    ['a flow mapping opener', '{uid'],
+    ['a tag marker', '!uid'],
+    ['an anchor marker', '&uid'],
+    ['a complex key marker', '? tag'],
+  ])('writes nothing when the configured key is %s', (_label, badKey) => {
     const rule = YamlUid.getRule();
     const before = '---\nnote-id: 689ca1d9-f412-4a26-b798-98c52c9ed050\n---\n# Title\n';
 
@@ -540,6 +549,40 @@ describe('yaml-uid', () => {
 
     // no throw, and no second identity field invented under a key the vault may not use
     expect(after).toBe(before);
+  });
+
+  it('does not give a note without frontmatter an empty block when the key is unusable', () => {
+    const rule = YamlUid.getRule();
+    const before = '# Title\nsome body text';
+
+    // initYAML would add `---\n---\n`, so the key has to be judged before it runs
+    expect(rule.apply(before, {
+      uidKey: '',
+      format: 'uuid-v7',
+      replaceUnusableValues: false,
+    })).toBe(before);
+  });
+
+  it.each([
+    ['the default', 'uid'],
+    ['a hyphenated key', 'note-id'],
+    ['a dotted key', 'meta.id'],
+    ['a colon-namespaced key', 'dc:identifier'],
+    ['a key with a space', 'note id'],
+    ['a unicode key', 'üid'],
+  ])('still writes an id for %s', (_label, goodKey) => {
+    const rule = YamlUid.getRule();
+    const after = rule.apply('---\ntitle: no id\n---\n# Title\n', {
+      uidKey: goodKey,
+      format: 'uuid-v7',
+      replaceUnusableValues: false,
+    });
+
+    expect(after).toContain(`${goodKey}: `);
+    // and what was written parses back to exactly that key holding a usable id
+    const written = /\n([^\n]+): ([^\n]+)\n---/.exec(after);
+    expect(written?.[1]).toBe(goodKey);
+    expect(isUsableUid(written?.[2] ?? null)).toBe(true);
   });
 
   it('sees through YAML quoting when judging an id', () => {
