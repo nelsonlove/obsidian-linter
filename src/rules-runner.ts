@@ -22,6 +22,9 @@ import {convertStringVersionOfEscapeCharactersToEscapeCharacters} from './utils/
 import {getTextInLanguage} from './lang/helpers';
 import CapitalizeHeadings from './rules/capitalize-headings';
 import YamlTitle from './rules/yaml-title';
+// imported so the rule registers itself; it has no special execution order and runs in the
+// generic rule loop like the other YAML rules
+import './rules/yaml-uid';
 import YamlTitleAlias from './rules/yaml-title-alias';
 import BlockquoteStyle from './rules/blockquote-style';
 import {IgnoreTypes, ignoreListOfTypes} from './utils/ignore-types';
@@ -104,6 +107,9 @@ export class RulesRunner {
 
       [newText] = RuleBuilderBase.applyIfEnabledBase(rule, newText, runOptions.settings, {
         fileCreatedTime: runOptions.fileInfo.createdAtFormatted,
+        // the key the vault actually calls its created date, so a rule needing that date does not
+        // carry a second copy of the setting that can drift from the timestamp rule's
+        dateCreatedKey: runOptions.settings.ruleConfigs['yaml-timestamp']?.['date-created-key'],
         fileModifiedTime: runOptions.fileInfo.modifiedAtFormatted,
         fileName: runOptions.fileInfo.name,
         locale: runOptions.momentLocale,
