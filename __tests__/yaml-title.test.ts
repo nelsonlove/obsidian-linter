@@ -499,6 +499,50 @@ ruleTest({
       },
     },
     {
+      testName: 'When `preserveExistingTitle = true`, a nested key of the same name does not shadow the real title',
+      before: dedent`
+        ---
+        metadata:
+          title:
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        metadata:
+          title:
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, an empty top-level title is still filled in despite a non-empty nested key',
+      before: dedent`
+        ---
+        metadata:
+          title: Some unrelated nested text
+        title:
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        metadata:
+          title: Some unrelated nested text
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
       testName: 'When `preserveExistingTitle = true`, a block scalar title is preserved',
       before: dedent`
         ---

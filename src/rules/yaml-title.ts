@@ -75,7 +75,9 @@ export default class YamlTitle extends RuleBuilder<YamlTitleOptions> {
       const title_match = new RegExp(title_match_str);
       if (title_match.test(text)) {
         // when preserving, an existing non-empty title is left exactly as the author wrote it
-        if (options.preserveExistingTitle && !titleValueIsEmpty(getYamlSectionValue(text, options.titleKey))) {
+        // allowNestedKey is false so that a nested key of the same name cannot shadow the real
+        // top-level title; that must agree with title_match, which only matches an unindented key
+        if (options.preserveExistingTitle && !titleValueIsEmpty(getYamlSectionValue(text, options.titleKey, false))) {
           return text;
         }
 
