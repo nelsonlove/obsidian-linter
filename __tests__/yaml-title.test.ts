@@ -479,6 +479,46 @@ ruleTest({
       },
     },
     {
+      testName: 'When `preserveExistingTitle = true`, a title continued on the next line is preserved, not treated as empty',
+      before: dedent`
+        ---
+        title:
+          A title on the following line
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title:
+          A title on the following line
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a block scalar title is preserved',
+      before: dedent`
+        ---
+        title: |
+          A block scalar title
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: |
+          A block scalar title
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
       testName: 'When `preserveExistingTitle = true`, a preserved title is not disturbed by a value needing escaping in the H1',
       before: dedent`
         ---
