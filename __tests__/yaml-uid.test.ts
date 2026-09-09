@@ -519,14 +519,27 @@ describe('yaml-uid', () => {
     })).not.toThrow();
   });
 
-  it('does not throw out of apply when the configured key is corrupted to null', () => {
+  it.each([
+    ['null', null],
+    ['an empty string', ''],
+    ['whitespace only', '   '],
+    ['a key containing a newline', 'a\nb'],
+    ['a key containing a colon', 'a:b'],
+  ])('writes nothing rather than guessing when the configured key is %s', (_label, badKey) => {
     const rule = YamlUid.getRule();
+    const before = '---\nnote-id: 689ca1d9-f412-4a26-b798-98c52c9ed050\n---\n# Title\n';
 
-    expect(() => rule.apply('---\ntitle: A note\n---\n# Title\n', {
-      uidKey: null as unknown as string,
-      format: 'uuid-v7',
-      replaceUnusableValues: false,
-    })).not.toThrow();
+    let after: string;
+    expect(() => {
+      after = rule.apply(before, {
+        uidKey: badKey as unknown as string,
+        format: 'uuid-v7',
+        replaceUnusableValues: false,
+      });
+    }).not.toThrow();
+
+    // no throw, and no second identity field invented under a key the vault may not use
+    expect(after).toBe(before);
   });
 
   it('sees through YAML quoting when judging an id', () => {

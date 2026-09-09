@@ -164,8 +164,15 @@ export default class YamlUid extends RuleBuilder<YamlUidOptions> {
     text = initYAML(text);
 
     return formatYAML(text, (text) => {
-      // a corrupted setting must not throw: that would abort this file's whole lint silently
-      const uidKey = typeof options.uidKey === 'string' && options.uidKey.trim() !== '' ? options.uidKey : 'uid';
+      // A corrupted setting must not throw, since that would abort this file's whole lint silently.
+      // It must not fall back to the default key either: if the vault's real key were something
+      // else, writing to `uid` would add a second, competing identity to every note, quietly, on
+      // every run. Without a key there is no way to know which field holds the id, so write nothing.
+      const uidKey = typeof options.uidKey === 'string' ? options.uidKey.trim() : '';
+      if (uidKey === '' || /[\n\r:]/.test(uidKey)) {
+        return text;
+      }
+
       // the key is user-configurable, so it must be escaped everywhere it becomes a pattern. An
       // unescaped `.` in a key like `meta.id` matches any character, and the two regexes below must
       // agree about which line is this note's id — if the read finds one line and the write another,
