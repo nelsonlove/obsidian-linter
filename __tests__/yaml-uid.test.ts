@@ -261,6 +261,130 @@ ruleTest({
       },
     },
     {
+      testName: 'A regex metacharacter in the uid key cannot clobber an unrelated field',
+      before: dedent`
+        ---
+        idXv2: some-unrelated-field-value
+        other: keep-me
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        idXv2: some-unrelated-field-value
+        other: keep-me
+        id.v2: 019e697e-a3af-7fdb-bbcf-5ca69a5f7555
+        ---
+        # Title
+      `,
+      options: {
+        uidKey: 'id.v2',
+        replaceUnusableValues: true,
+        generateUid: fixedUid('019e697e-a3af-7fdb-bbcf-5ca69a5f7555'),
+      },
+    },
+    {
+      testName: 'A quoted id is recognised and left alone even with replacement on',
+      before: dedent`
+        ---
+        uid: "689ca1d9-f412-4a26-b798-98c52c9ed050"
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        uid: "689ca1d9-f412-4a26-b798-98c52c9ed050"
+        ---
+        # Title
+      `,
+      options: {
+        replaceUnusableValues: true,
+        generateUid: fixedUid('11111111-1111-7111-8111-111111111111'),
+      },
+    },
+    {
+      testName: 'A single-quoted id is recognised and left alone',
+      before: dedent`
+        ---
+        uid: '689ca1d9-f412-4a26-b798-98c52c9ed050'
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        uid: '689ca1d9-f412-4a26-b798-98c52c9ed050'
+        ---
+        # Title
+      `,
+      options: {
+        replaceUnusableValues: true,
+        generateUid: fixedUid('11111111-1111-7111-8111-111111111111'),
+      },
+    },
+    {
+      testName: 'A block scalar id is never replaced, since its body cannot be read here',
+      before: dedent`
+        ---
+        uid: |
+          689ca1d9-f412-4a26-b798-98c52c9ed050
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        uid: |
+          689ca1d9-f412-4a26-b798-98c52c9ed050
+        ---
+        # Title
+      `,
+      options: {
+        replaceUnusableValues: true,
+        generateUid: fixedUid('11111111-1111-7111-8111-111111111111'),
+      },
+    },
+    {
+      testName: 'A folded scalar id is never replaced either',
+      before: dedent`
+        ---
+        uid: >
+          689ca1d9-f412-4a26-b798-98c52c9ed050
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        uid: >
+          689ca1d9-f412-4a26-b798-98c52c9ed050
+        ---
+        # Title
+      `,
+      options: {
+        replaceUnusableValues: true,
+        generateUid: fixedUid('11111111-1111-7111-8111-111111111111'),
+      },
+    },
+    {
+      testName: 'A created date before 1970 falls back instead of aborting the lint of the file',
+      before: dedent`
+        ---
+        created: 1965-01-01T00:00:00Z
+        ---
+        # Title
+      `,
+      after: dedent`
+        ---
+        created: 1965-01-01T00:00:00Z
+        uid: 1788912000000
+        ---
+        # Title
+      `,
+      options: {
+        dateCreatedKey: 'created',
+        fileCreatedTime: '2026-09-09T00:00:00Z',
+        generateUid: echoTimestamp,
+      },
+    },
+    {
       testName: 'The configured format reaches the generator',
       before: dedent`
         ---
@@ -320,5 +444,23 @@ describe('yaml-uid', () => {
   it('rejects a timestamp that cannot fit in a UUIDv7', () => {
     expect(() => uuidV7(-1)).toThrow(TypeError);
     expect(() => uuidV7(0x1000000000000)).toThrow(TypeError);
+  });
+
+  it('does not throw out of apply for a created date outside the UUIDv7 range', () => {
+    const rule = YamlUid.getRule();
+
+    expect(() => rule.apply('---\ncreated: 1965-01-01T00:00:00Z\n---\n# Title\n', {
+      dateCreatedKey: 'created',
+      uidKey: 'uid',
+      format: 'uuid-v7',
+      replaceUnusableValues: false,
+    })).not.toThrow();
+  });
+
+  it('sees through YAML quoting when judging an id', () => {
+    expect(isUsableUid('"689ca1d9-f412-4a26-b798-98c52c9ed050"')).toBe(true);
+    expect(isUsableUid('\'689ca1d9-f412-4a26-b798-98c52c9ed050\'')).toBe(true);
+    expect(isUsableUid('  689ca1d9-f412-4a26-b798-98c52c9ed050  ')).toBe(true);
+    expect(isUsableUid('"not-a-uuid"')).toBe(false);
   });
 });

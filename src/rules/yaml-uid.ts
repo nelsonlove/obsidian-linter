@@ -3,7 +3,7 @@ import {Options, RuleType} from '../rules';
 import RuleBuilder, {BooleanOptionBuilder, DropdownOptionBuilder, ExampleBuilder, OptionBuilderBase, TextOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
 import {formatYAML, getYamlSectionValue, initYAML} from '../utils/yaml';
-import {escapeDollarSigns} from '../utils/regex';
+import {escapeDollarSigns, escapeRegExp} from '../utils/regex';
 import {insert} from '../utils/strings';
 
 export type UidFormatValues = 'uuid-v7' | 'uuid-v4';
@@ -16,8 +16,34 @@ export type UidFormatValues = 'uuid-v7' | 'uuid-v4';
  */
 const USABLE_UID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/**
+ * Strips one layer of matching YAML quotes so that a quoted id is judged on the id itself. Without
+ * this a perfectly good `uid: "<uuid>"` reads as unusable and is destroyed.
+ * @param {string} value The raw value as it appears after the key's colon.
+ * @return {string} The value with a single matching pair of surrounding quotes removed.
+ */
+function unquote(value: string): string {
+  const trimmedValue = value.trim();
+  const firstCharacter = trimmedValue[0];
+  if ((firstCharacter === '"' || firstCharacter === '\'') && trimmedValue.endsWith(firstCharacter) && trimmedValue.length > 1) {
+    return trimmedValue.slice(1, -1).trim();
+  }
+
+  return trimmedValue;
+}
+
+/**
+ * A block or folded scalar's body lives on the following lines, which the single-line value read
+ * cannot see. Such a value can never be judged, so it must never be treated as replaceable.
+ * @param {string} value The raw value as it appears after the key's colon.
+ * @return {boolean} True when the value continues on later lines in a form that cannot be read here.
+ */
+function isUnreadableScalar(value: string): boolean {
+  return /^[|>]/.test(value.trim());
+}
+
 export function isUsableUid(value: string | null): boolean {
-  return value != null && USABLE_UID.test(value.trim());
+  return value != null && USABLE_UID.test(unquote(value));
 }
 
 function bytesToUuid(bytes: Uint8Array): string {
@@ -32,6 +58,18 @@ function randomBytes(): Uint8Array {
 }
 
 /**
+ * A UUIDv7 carries the timestamp in 48 bits, so only times from the epoch to about the year 10889
+ * can be represented. Callers check before generating, since a date outside that range is a note
+ * to fall back on rather than a reason to abort the file's lint.
+ * @param {number} timestampMs Milliseconds since the epoch.
+ * @return {boolean} True when the time can be packed into a UUIDv7.
+ */
+export function fitsInUuidV7(timestampMs: number): boolean {
+  const timestamp = Math.trunc(timestampMs);
+  return Number.isFinite(timestamp) && timestamp >= 0 && timestamp <= 0xffffffffffff;
+}
+
+/**
  * Writes a 48-bit big-endian millisecond timestamp into the leading bytes and sets the version and
  * variant nibbles, leaving the remaining bytes as supplied.
  * @param {Uint8Array} bytes The sixteen bytes to lay the id out in.
@@ -40,7 +78,7 @@ function randomBytes(): Uint8Array {
  */
 function layOutUuidV7(bytes: Uint8Array, timestampMs: number): string {
   const timestamp = Math.trunc(timestampMs);
-  if (!Number.isFinite(timestamp) || timestamp < 0 || timestamp > 0xffffffffffff) {
+  if (!fitsInUuidV7(timestamp)) {
     throw new TypeError(`Invalid UUIDv7 timestamp: ${timestampMs}`);
   }
 
@@ -123,7 +161,10 @@ export default class YamlUid extends RuleBuilder<YamlUidOptions> {
     text = initYAML(text);
 
     return formatYAML(text, (text) => {
-      const uid_match_str = `\n${options.uidKey}:.*\n`;
+      // the key is user-configurable, so it must be escaped before it becomes a pattern: an
+      // unescaped `.` in a key like `meta.id` matches any character and the replace below would
+      // then rewrite a different field entirely
+      const uid_match_str = `\n${escapeRegExp(options.uidKey)}:.*\n`;
       const uid_match = new RegExp(uid_match_str);
       const keyIsPresent = uid_match.test(text);
 
@@ -136,7 +177,9 @@ export default class YamlUid extends RuleBuilder<YamlUidOptions> {
         }
 
         const valueIsEmpty = existingValue == null || existingValue.trim() === '';
-        if (!valueIsEmpty && !options.replaceUnusableValues) {
+        // a value that cannot be read in full is never replaced, whatever the setting says: the
+        // body of a block scalar is on later lines, so replacing the key line alone would strand it
+        if (!valueIsEmpty && (!options.replaceUnusableValues || isUnreadableScalar(existingValue))) {
           return text;
         }
       }
@@ -170,12 +213,15 @@ export default class YamlUid extends RuleBuilder<YamlUidOptions> {
       }
 
       const parsed = moment(candidate.trim(), moment.ISO_8601);
-      if (parsed.isValid()) {
+      // a date before 1970 or beyond the year 10889 parses fine but cannot be packed into a
+      // UUIDv7, and throwing here would abort the whole lint of this file, silently, on every run
+      if (parsed.isValid() && fitsInUuidV7(parsed.valueOf())) {
         return parsed.valueOf();
       }
     }
 
-    return (options.currentTime ?? moment()).valueOf();
+    const now = (options.currentTime ?? moment()).valueOf();
+    return fitsInUuidV7(now) ? now : 0;
   }
   get exampleBuilders(): ExampleBuilder<YamlUidOptions>[] {
     return [
