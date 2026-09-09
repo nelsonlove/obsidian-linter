@@ -1,7 +1,7 @@
 import {Options, RuleType} from '../rules';
 import RuleBuilder, {BooleanOptionBuilder, ExampleBuilder, OptionBuilderBase, TextOptionBuilder, DropdownOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
-import {escapeStringIfNecessaryAndPossible, formatYAML, initYAML, QuoteCharacter} from '../utils/yaml';
+import {escapeStringIfNecessaryAndPossible, formatYAML, getYamlSectionValue, initYAML, QuoteCharacter} from '../utils/yaml';
 import {ignoreListOfTypes, IgnoreTypes} from '../utils/ignore-types';
 import {escapeDollarSigns, getFirstHeaderOneText} from '../utils/regex';
 import {insert} from '../utils/strings';
@@ -23,13 +23,19 @@ class YamlTitleOptions implements Options {
 }
 
 /**
- * Determines whether the text following `<title key>:` on the title line represents no value.
- * An absent value, whitespace, and an explicitly empty string (`''` or `""`) all count as empty,
- * since each leaves the note without a usable title.
- * @param {string} rawValue The text between the title key's colon and the end of that line.
+ * Determines whether an existing title value represents no value. An absent value, whitespace,
+ * and an explicitly empty string (`''` or `""`) all count as empty, since each leaves the note
+ * without a usable title. The value must be read with `getYamlSectionValue` rather than from the
+ * title line alone: a plain scalar may continue onto following indented lines, and such a title is
+ * authored content that must not be treated as empty.
+ * @param {string | null} rawValue The title key's value as returned by `getYamlSectionValue`.
  * @return {boolean} True when the existing title carries no usable value.
  */
-function titleValueIsEmpty(rawValue: string): boolean {
+function titleValueIsEmpty(rawValue: string | null): boolean {
+  if (rawValue == null) {
+    return true;
+  }
+
   const trimmedValue = rawValue.trim();
   return trimmedValue === '' || trimmedValue === '\'\'' || trimmedValue === '""';
 }
@@ -65,12 +71,11 @@ export default class YamlTitle extends RuleBuilder<YamlTitleOptions> {
     title = escapeStringIfNecessaryAndPossible(title, options.defaultEscapeCharacter);
 
     return formatYAML(text, (text) => {
-      const title_match_str = `\n${options.titleKey}:(.*)\n`;
+      const title_match_str = `\n${options.titleKey}:.*\n`;
       const title_match = new RegExp(title_match_str);
-      const existing_title = title_match.exec(text);
-      if (existing_title) {
+      if (title_match.test(text)) {
         // when preserving, an existing non-empty title is left exactly as the author wrote it
-        if (options.preserveExistingTitle && !titleValueIsEmpty(existing_title[1])) {
+        if (options.preserveExistingTitle && !titleValueIsEmpty(getYamlSectionValue(text, options.titleKey))) {
           return text;
         }
 
