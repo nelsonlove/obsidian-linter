@@ -2,7 +2,7 @@ import {moment} from 'obsidian';
 import {Options, RuleType} from '../rules';
 import RuleBuilder, {BooleanOptionBuilder, DropdownOptionBuilder, ExampleBuilder, OptionBuilderBase, TextOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
-import {formatYAML, getYamlSectionValue, initYAML} from '../utils/yaml';
+import {formatYAML, getYamlSectionValue, initYAML, loadYAML} from '../utils/yaml';
 import {escapeDollarSigns, escapeRegExp} from '../utils/regex';
 import {insert} from '../utils/strings';
 
@@ -47,6 +47,37 @@ function isUnjudgeableValue(value: string): boolean {
 
 export function isUsableUid(value: string | null): boolean {
   return value != null && USABLE_UID.test(unquote(value));
+}
+
+const KEY_PROBE_VALUE = '019e697e-a3af-7fdb-bbcf-5ca69a5f7555';
+
+/**
+ * True when writing `<key>: <value>` produces exactly that one key holding exactly that value.
+ *
+ * The question is not which characters look dangerous — a hand-picked deny-list gets this wrong in
+ * both directions. `dc:identifier` is a legal plain key that a character ban rejects, while a key
+ * beginning with `#`, `-`, `[`, `{`, `!`, `&` or `?` passes such a ban and then turns the written
+ * line into a comment, a sequence entry, a tag or a flow collection — losing the id and sometimes
+ * the note's other frontmatter with it. Asking the YAML parser what the line actually means is the
+ * only answer that stays correct, so the key is probed against it rather than pattern-matched.
+ * @param {string} key The configured key, already trimmed.
+ * @return {boolean} True when the key can be written and read back unchanged.
+ */
+function isWritableFrontmatterKey(key: string): boolean {
+  if (key === '') {
+    return false;
+  }
+
+  try {
+    const parsed = loadYAML(`${key}: ${KEY_PROBE_VALUE}\n`) as Record<string, unknown>;
+    return parsed != null &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed) &&
+      Object.keys(parsed).length === 1 &&
+      parsed[key] === KEY_PROBE_VALUE;
+  } catch {
+    return false;
+  }
 }
 
 function bytesToUuid(bytes: Uint8Array): string {
@@ -161,18 +192,18 @@ export default class YamlUid extends RuleBuilder<YamlUidOptions> {
     return YamlUidOptions;
   }
   apply(text: string, options: YamlUidOptions): string {
+    // Checked before initYAML, which would otherwise give a note with no frontmatter an empty
+    // block even though nothing else is going to be written. Clearing the key field in settings
+    // reaches this, so it is an ordinary state, not only a corrupted one. Without a usable key
+    // there is no way to know which field holds the id, so nothing at all happens.
+    const uidKey = typeof options.uidKey === 'string' ? options.uidKey.trim() : '';
+    if (!isWritableFrontmatterKey(uidKey)) {
+      return text;
+    }
+
     text = initYAML(text);
 
     return formatYAML(text, (text) => {
-      // A corrupted setting must not throw, since that would abort this file's whole lint silently.
-      // It must not fall back to the default key either: if the vault's real key were something
-      // else, writing to `uid` would add a second, competing identity to every note, quietly, on
-      // every run. Without a key there is no way to know which field holds the id, so write nothing.
-      const uidKey = typeof options.uidKey === 'string' ? options.uidKey.trim() : '';
-      if (uidKey === '' || /[\n\r:]/.test(uidKey)) {
-        return text;
-      }
-
       // the key is user-configurable, so it must be escaped everywhere it becomes a pattern. An
       // unescaped `.` in a key like `meta.id` matches any character, and the two regexes below must
       // agree about which line is this note's id — if the read finds one line and the write another,
