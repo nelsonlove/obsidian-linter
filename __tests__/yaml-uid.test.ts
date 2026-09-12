@@ -541,7 +541,7 @@ describe('yaml-uid', () => {
     let after: string;
     expect(() => {
       after = rule.apply(before, {
-        uidKey: badKey as unknown as string,
+        uidKey: badKey,
         format: 'uuid-v7',
         replaceUnusableValues: false,
       });

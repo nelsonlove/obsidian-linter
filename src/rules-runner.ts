@@ -106,7 +106,7 @@ export class RulesRunner {
         fileCreatedTime: runOptions.fileInfo.createdAtFormatted,
         // the key the vault actually calls its created date, so a rule needing that date does not
         // carry a second copy of the setting that can drift from the timestamp rule's
-        dateCreatedKey: runOptions.settings.ruleConfigs['yaml-timestamp']?.['date-created-key'],
+        dateCreatedKey: (runOptions.settings.ruleConfigs['yaml-timestamp'] as {[k: string]: string | null})?.['date-created-key'],
         fileModifiedTime: runOptions.fileInfo.modifiedAtFormatted,
         fileName: runOptions.fileInfo.name,
         locale: runOptions.momentLocale,
