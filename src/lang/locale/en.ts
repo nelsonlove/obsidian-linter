@@ -108,7 +108,6 @@ export default {
     'empty-clipboard': 'There is no clipboard content.',
     'characters-added': 'characters added',
     'characters-removed': 'characters removed',
-    'copy-to-clipboard-failed': 'Failed to copy text to clipboard: ',
     'apply-lint-preview': 'Apply',
     'diff-large-file-warning': 'This file is large. Diff rendering is skipped until you ask for it.',
     'diff-skipped-lines': '{COUNT} unchanged lines hidden',
@@ -131,8 +130,6 @@ export default {
   'custom-command-warning': 'Linting multiple files with custom commands enabled is a slow process that requires the ability to open panes in the side panel. It is noticeably slower than running without custom commands enabled. Please proceed with caution.',
   'cancel-button-text': 'Cancel',
   'do-not-show-again': 'Do not show this confirmation again',
-
-  'copy-aria-label': 'Copy',
 
   'disabled-other-rule-notice': 'If you enable <code>{NAME_1}</code>, it will disable <code>{NAME_2}</code>. Would you like to proceed?',
   'disabled-conflicting-rule-notice': '{NAME_1}, conflicts with {NAME_2}, so it has been turned off. You can switch which setting is off in the settings tab.',
@@ -165,8 +162,6 @@ export default {
       'paste': 'Paste',
       'debug': 'Debug',
     },
-    // tab-searcher.ts
-    'default-search-bar-text': 'Search all settings',
     'general': {
       // settings.ts
       'yaml': 'YAML common styles',
@@ -203,7 +198,6 @@ export default {
         'description': 'Folders to ignore when linting all files or linting on save.',
         'folder-search-placeholder-text': 'Folder name',
         'add-input-button-text': 'Add another folder to ignore',
-        'delete-tooltip': 'Delete',
         'empty-state': 'No folders are being ignored yet.',
       },
       'files-to-ignore': {
@@ -211,10 +205,8 @@ export default {
         'description': 'Files to ignore when linting all files or linting on save.',
         'file-search-placeholder-text': 'regex for file to ignore',
         'add-input-button-text': 'Add another file to ignore regex',
-        'delete-tooltip': 'Delete',
         'label-placeholder-text': 'label',
         'flags-placeholder-text': 'flags',
-        'warning': 'Use this with caution if you do not know regex. Also, please make sure that if you use lookbehinds in your regex on iOS mobile that you are on a version that supports using them.',
         'pattern-required': 'Match pattern is required',
         'empty-state': 'No files are being ignored yet.',
       },
@@ -223,7 +215,6 @@ export default {
         'description': 'File extensions to lint in addition to md. For example, mdx or svx. Do not include the leading dot. <b>Note: Only files that Obsidian sees as markdown (whether natively or via other plugins) will be linted, regardless of extensions added.</b>',
         'extension-placeholder': 'e.g. mdx',
         'add-input-button-text': 'Add another extension',
-        'delete-tooltip': 'Delete',
         'empty-state': 'No additional file extensions yet.',
       },
       'override-locale': {
@@ -279,13 +270,9 @@ export default {
       // custom-command-option.ts
       'name': 'Custom commands',
       'description': 'Custom commands are Obsidian commands that get run after the linter is finished running its regular rules. This means that they do not run before the YAML timestamp logic runs, so they can cause YAML timestamp to be triggered on the next run of the linter. You may only select an Obsidian command once.',
-      'warning': 'When selecting an option, make sure to select the option either by using the mouse or by hitting the enter key. Other selection methods may not work and only selections of an actual Obsidian command or an empty string will be saved.',
 
       'add-input-button-text': 'Add new command',
       'command-search-placeholder-text': 'Obsidian command',
-      'move-up-tooltip': 'Move up',
-      'move-down-tooltip': 'Move down',
-      'delete-tooltip': 'Delete',
       'empty-state': 'No custom commands have been added yet.',
       'edit-tooltip': 'Edit',
       'enabled': 'Enabled',
@@ -294,15 +281,11 @@ export default {
       // custom-replace-option.ts
       'name': 'Custom regex replacement',
       'description': 'Custom regex replacement can be used to replace anything that matches the find regex with the replacement value. The replace and find values will need to be valid regex values.',
-      'warning': 'Use this with caution if you do not know regex. Also, please make sure that if you use lookbehinds in your regex on iOS mobile that you are on a version that supports using them.',
       'add-input-button-text': 'Add new regex replacement',
       'regex-to-find-placeholder-text': 'regex to find',
       'flags-placeholder-text': 'flags',
       'regex-to-replace-placeholder-text': 'regex to replace',
       'label-placeholder-text': 'label',
-      'move-up-tooltip': 'Move up',
-      'move-down-tooltip': 'Move down',
-      'delete-tooltip': 'Delete',
       'edit-tooltip': 'Edit',
       'empty-state': 'No custom regex replacements have been added yet.',
       'invalid-regex': 'Invalid regex',
@@ -949,12 +932,32 @@ export default {
       },
     },
     // yaml-title.ts
+    'yaml-uid': {
+      'name': 'YAML uid',
+      'description': 'Gives a note a stable unique id in its frontmatter. Only ever writes when the id is missing or empty, so an id that already exists is never regenerated.',
+      'uid-key': {
+        'name': 'Uid key',
+        'description': 'Which YAML key holds the id',
+      },
+      'format': {
+        'name': 'Format',
+        'description': 'The kind of id to generate for a note that does not have one',
+      },
+      'replace-unusable-values': {
+        'name': 'Replace unusable values',
+        'description': 'Also replace a value that is not a UUID of any version, such as a template placeholder left unexpanded. A well-formed UUID is never replaced whatever its version, so changing the format above does not rewrite existing ids.',
+      },
+    },
     'yaml-title': {
       'name': 'YAML title',
       'description': 'Inserts the title of the file into the YAML frontmatter. Gets the title based on the selected mode.',
       'title-key': {
         'name': 'Title key',
         'description': 'Which YAML key to use for title',
+      },
+      'preserve-existing-title': {
+        'name': 'Preserve existing title',
+        'description': 'Only set the title when it is missing or empty, leaving a title that is already present untouched. Note that the title will then no longer follow renames or heading changes.',
       },
       'mode': {
         'name': 'Mode',
@@ -1005,6 +1008,8 @@ export default {
     'first-h1': 'First H1',
     'first-h1-or-filename-if-h1-missing': 'First H1 or Filename if H1 is Missing',
     'filename': 'Filename',
+    'uuid-v7': 'UUIDv7',
+    'uuid-v4': 'UUIDv4',
     // settings-data.ts
     'never': 'Never',
     'after 5 seconds': 'After 5 seconds',

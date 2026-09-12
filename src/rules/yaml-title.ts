@@ -1,7 +1,7 @@
 import {Options, RuleType} from '../rules';
-import RuleBuilder, {ExampleBuilder, OptionBuilderBase, TextOptionBuilder, DropdownOptionBuilder} from './rule-builder';
+import RuleBuilder, {BooleanOptionBuilder, ExampleBuilder, OptionBuilderBase, TextOptionBuilder, DropdownOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
-import {escapeStringIfNecessaryAndPossible, formatYAML, initYAML, QuoteCharacter} from '../utils/yaml';
+import {escapeStringIfNecessaryAndPossible, formatYAML, getYamlSectionValue, initYAML, QuoteCharacter} from '../utils/yaml';
 import {ignoreListOfTypes, IgnoreTypes} from '../utils/ignore-types';
 import {escapeDollarSigns, getFirstHeaderOneText} from '../utils/regex';
 import {insert} from '../utils/strings';
@@ -18,6 +18,26 @@ class YamlTitleOptions implements Options {
   titleKey?: string = 'title';
 
   mode?: YamlTitleModeValues = 'first-h1-or-filename-if-h1-missing';
+
+  preserveExistingTitle?: boolean = false;
+}
+
+/**
+ * Determines whether an existing title value represents no value. An absent value, whitespace,
+ * and an explicitly empty string (`''` or `""`) all count as empty, since each leaves the note
+ * without a usable title. The value must be read with `getYamlSectionValue` rather than from the
+ * title line alone: a plain scalar may continue onto following indented lines, and such a title is
+ * authored content that must not be treated as empty.
+ * @param {string | null} rawValue The title key's value as returned by `getYamlSectionValue`.
+ * @return {boolean} True when the existing title carries no usable value.
+ */
+function titleValueIsEmpty(rawValue: string | null): boolean {
+  if (rawValue == null) {
+    return true;
+  }
+
+  const trimmedValue = rawValue.trim();
+  return trimmedValue === '' || trimmedValue === '\'\'' || trimmedValue === '""';
 }
 
 @RuleBuilder.register
@@ -54,6 +74,13 @@ export default class YamlTitle extends RuleBuilder<YamlTitleOptions> {
       const title_match_str = `\n${options.titleKey}:.*\n`;
       const title_match = new RegExp(title_match_str);
       if (title_match.test(text)) {
+        // when preserving, an existing non-empty title is left exactly as the author wrote it
+        // allowNestedKey is false so that a nested key of the same name cannot shadow the real
+        // top-level title; that must agree with title_match, which only matches an unindented key
+        if (options.preserveExistingTitle && !titleValueIsEmpty(getYamlSectionValue(text, options.titleKey, false))) {
+          return text;
+        }
+
         text = text.replace(
             title_match,
             escapeDollarSigns(`\n${options.titleKey}: ${title}\n`),
@@ -154,6 +181,12 @@ export default class YamlTitle extends RuleBuilder<YamlTitleOptions> {
         nameKey: 'rules.yaml-title.title-key.name',
         descriptionKey: 'rules.yaml-title.title-key.description',
         optionsKey: 'titleKey',
+      }),
+      new BooleanOptionBuilder({
+        OptionsClass: YamlTitleOptions,
+        nameKey: 'rules.yaml-title.preserve-existing-title.name',
+        descriptionKey: 'rules.yaml-title.preserve-existing-title.description',
+        optionsKey: 'preserveExistingTitle',
       }),
       new DropdownOptionBuilder<YamlTitleOptions, YamlTitleModeValues>({
         OptionsClass: YamlTitleOptions,
