@@ -19,6 +19,11 @@ declare module 'obsidian' {
       appContainerEl: HTMLElement;
     };
     workspace: Workspace;
+    viewRegistry: ViewRegistry
+  }
+
+  interface ViewRegistry {
+    unregisterView(type: string): void
   }
 
   interface Workspace {
@@ -53,12 +58,12 @@ declare module 'obsidian' {
     /**
      * @public
      */
-    getState(): any;
+    getState(): Record<string, unknown>;
 
     /**
      * @public
      */
-    setState(state: any, result: ViewStateResult): Promise<void>;
+    setState(state: unknown, result: ViewStateResult): Promise<void>;
   }
 
   interface ViewStateResult {

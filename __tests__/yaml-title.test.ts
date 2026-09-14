@@ -387,18 +387,211 @@ ruleTest({
         # Escape \\[\\_\\]
       `,
     },
+    {
+      testName: 'When `preserveExistingTitle = true`, an existing title is left alone even though the H1 differs',
+      before: dedent`
+        ---
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a missing title is still added',
+      before: dedent`
+        ---
+        uid: 123
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        uid: 123
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a title key with no value is filled in',
+      before: dedent`
+        ---
+        title:
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, an explicitly empty title is filled in',
+      before: dedent`
+        ---
+        title: ""
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = false`, an existing title is still overwritten',
+      before: dedent`
+        ---
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: false,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a title continued on the next line is preserved, not treated as empty',
+      before: dedent`
+        ---
+        title:
+          A title on the following line
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title:
+          A title on the following line
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a nested key of the same name does not shadow the real title',
+      before: dedent`
+        ---
+        metadata:
+          title:
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        metadata:
+          title:
+        title: A title chosen by hand
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, an empty top-level title is still filled in despite a non-empty nested key',
+      before: dedent`
+        ---
+        metadata:
+          title: Some unrelated nested text
+        title:
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        metadata:
+          title: Some unrelated nested text
+        title: Hello world
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a block scalar title is preserved',
+      before: dedent`
+        ---
+        title: |
+          A block scalar title
+        ---
+        # Hello world
+      `,
+      after: dedent`
+        ---
+        title: |
+          A block scalar title
+        ---
+        # Hello world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
+    {
+      testName: 'When `preserveExistingTitle = true`, a preserved title is not disturbed by a value needing escaping in the H1',
+      before: dedent`
+        ---
+        title: Plain title
+        ---
+        # Hello: world
+      `,
+      after: dedent`
+        ---
+        title: Plain title
+        ---
+        # Hello: world
+      `,
+      options: {
+        preserveExistingTitle: true,
+      },
+    },
   ],
 });
 
 describe('yaml-title', () => {
   it('should not show warning for invalid YAML string', () => {
-    const originalEmitWarning = process.emitWarning;
-    try {
-      process.emitWarning = jest.fn();
-      YamlTitle.getRule().apply('# !wrong-yaml-string');
-      expect(process.emitWarning).not.toHaveBeenCalled();
-    } finally {
-      process.emitWarning = originalEmitWarning;
-    }
+    const emitWarningSpy = jest
+      .spyOn(process, 'emitWarning')
+      .mockImplementation(() => {});
+
+    YamlTitle.getRule().apply('# !wrong-yaml-string');
+
+    expect(emitWarningSpy).not.toHaveBeenCalled();
   });
 });
+

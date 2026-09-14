@@ -1257,6 +1257,7 @@ Inserts the title of the file into the YAML frontmatter. Gets the title based on
 | Name | Description | List Items | Default Value |
 | ---- | ----------- | ---------- | ------------- |
 | `Title key` | Which YAML key to use for title | N/A | `title` |
+| `Preserve existing title` | Only set the title when it is missing or empty, leaving a title that is already present untouched. Note that the title will then no longer follow renames or heading changes. | N/A | false |
 | `Mode` | The method to use to get the title | `first-h1-or-filename-if-h1-missing`: Uses the first H1 in the file or the filename of the file if there is not H1<br/><br/>`filename`: Uses the filename as the title<br/><br/>`first-h1`: Uses the first H1 in the file as the title | `first-h1-or-filename-if-h1-missing` |
 
 
@@ -1509,5 +1510,65 @@ aliases:
 title: Filename
 ---
 
+``````
+</details>
+
+## YAML uid
+
+Alias: `yaml-uid`
+
+Gives a note a stable unique id in its frontmatter. Only ever writes when the id is missing or empty, so an id that already exists is never regenerated.
+
+### Options
+
+| Name | Description | List Items | Default Value |
+| ---- | ----------- | ---------- | ------------- |
+| `Uid key` | Which YAML key holds the id | N/A | `uid` |
+| `Format` | The kind of id to generate for a note that does not have one | `uuid-v7`: A UUIDv7, whose leading bits are the note's created time, so that ids sort by age<br/><br/>`uuid-v4`: A fully random UUIDv4, which carries no time information | `uuid-v7` |
+| `Replace unusable values` | Also replace a value that is not a UUID of any version, such as a template placeholder left unexpanded. A well-formed UUID is never replaced whatever its version, so changing the format above does not rewrite existing ids. | N/A | false |
+
+
+
+### Examples
+
+<details><summary>A note with no id gets one, with the timestamp taken from its created date</summary>
+
+Before:
+
+`````` markdown
+---
+created: 2026-05-21T23:00:00Z
+---
+# Title
+``````
+
+After:
+
+`````` markdown
+---
+created: 2026-05-21T23:00:00Z
+uid: 019e4cc4-6580-7000-8000-000000000000
+---
+# Title
+``````
+</details>
+<details><summary>An id that is already there is never regenerated, whichever UUID version it is</summary>
+
+Before:
+
+`````` markdown
+---
+uid: 689ca1d9-f412-4a26-b798-98c52c9ed050
+---
+# Title
+``````
+
+After:
+
+`````` markdown
+---
+uid: 689ca1d9-f412-4a26-b798-98c52c9ed050
+---
+# Title
 ``````
 </details>
