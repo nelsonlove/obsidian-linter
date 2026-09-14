@@ -563,6 +563,28 @@ describe('yaml-uid', () => {
     })).toBe(before);
   });
 
+  // every one of these leaves the note without an id, so every one must be filled in. A quoted
+  // empty string was silently skipped before, because this rule and yaml-title had grown two
+  // copies of "is it empty" and the copies disagreed.
+  it.each([
+    ['no value at all', '---\nuid:\n---\n# T\n'],
+    ['whitespace only', '---\nuid:   \n---\n# T\n'],
+    ['a double-quoted empty string', '---\nuid: ""\n---\n# T\n'],
+    ['a single-quoted empty string', '---\nuid: \'\'\n---\n# T\n'],
+    ['a quoted run of spaces', '---\nuid: "   "\n---\n# T\n'],
+  ])('fills in an id when the existing value is %s', (_label, before) => {
+    const rule = YamlUid.getRule();
+    const after = rule.apply(before, {
+      uidKey: 'uid',
+      format: 'uuid-v7',
+      replaceUnusableValues: false,
+      dateCreatedKey: 'created',
+    });
+
+    const written = /\nuid: (\S+)\n/.exec(after);
+    expect(isUsableUid(written?.[1] ?? null)).toBe(true);
+  });
+
   it.each([
     ['the default', 'uid'],
     ['a hyphenated key', 'note-id'],

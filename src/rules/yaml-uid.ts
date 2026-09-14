@@ -2,7 +2,7 @@ import {moment} from 'obsidian';
 import {Options, RuleType} from '../rules';
 import RuleBuilder, {BooleanOptionBuilder, DropdownOptionBuilder, ExampleBuilder, OptionBuilderBase, TextOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
-import {formatYAML, getYamlSectionValue, initYAML, loadYAML} from '../utils/yaml';
+import {formatYAML, getYamlSectionValue, initYAML, loadYAML, unquoteYamlValue, yamlValueIsEmpty} from '../utils/yaml';
 import {escapeDollarSigns, escapeRegExp} from '../utils/regex';
 import {insert} from '../utils/strings';
 
@@ -15,22 +15,6 @@ export type UidFormatValues = 'uuid-v7' | 'uuid-v4';
  * reclassify every existing id as garbage and rewrite it all on the next run.
  */
 const USABLE_UID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/**
- * Strips one layer of matching YAML quotes so that a quoted id is judged on the id itself. Without
- * this a perfectly good `uid: "<uuid>"` reads as unusable and is destroyed.
- * @param {string} value The raw value as it appears after the key's colon.
- * @return {string} The value with a single matching pair of surrounding quotes removed.
- */
-function unquote(value: string): string {
-  const trimmedValue = value.trim();
-  const firstCharacter = trimmedValue[0];
-  if ((firstCharacter === '"' || firstCharacter === '\'') && trimmedValue.endsWith(firstCharacter) && trimmedValue.length > 1) {
-    return trimmedValue.slice(1, -1).trim();
-  }
-
-  return trimmedValue;
-}
 
 /**
  * True for a value this rule cannot evaluate from the key's own line alone. A block or folded
@@ -46,7 +30,7 @@ function isUnjudgeableValue(value: string): boolean {
 }
 
 export function isUsableUid(value: string | null): boolean {
-  return value != null && USABLE_UID.test(unquote(value));
+  return value != null && USABLE_UID.test(unquoteYamlValue(value));
 }
 
 const KEY_PROBE_VALUE = '019e697e-a3af-7fdb-bbcf-5ca69a5f7555';
@@ -221,7 +205,7 @@ export default class YamlUid extends RuleBuilder<YamlUidOptions> {
           return text;
         }
 
-        const valueIsEmpty = existingValue == null || existingValue.trim() === '';
+        const valueIsEmpty = yamlValueIsEmpty(existingValue);
         if (!valueIsEmpty && (!options.replaceUnusableValues || isUnjudgeableValue(existingValue))) {
           return text;
         }

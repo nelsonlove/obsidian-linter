@@ -1,7 +1,7 @@
 import {Options, RuleType} from '../rules';
 import RuleBuilder, {BooleanOptionBuilder, ExampleBuilder, OptionBuilderBase, TextOptionBuilder, DropdownOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
-import {escapeStringIfNecessaryAndPossible, formatYAML, getYamlSectionValue, initYAML, QuoteCharacter} from '../utils/yaml';
+import {escapeStringIfNecessaryAndPossible, formatYAML, getYamlSectionValue, initYAML, QuoteCharacter, yamlValueIsEmpty} from '../utils/yaml';
 import {ignoreListOfTypes, IgnoreTypes} from '../utils/ignore-types';
 import {escapeDollarSigns, getFirstHeaderOneText} from '../utils/regex';
 import {insert} from '../utils/strings';
@@ -32,12 +32,7 @@ class YamlTitleOptions implements Options {
  * @return {boolean} True when the existing title carries no usable value.
  */
 function titleValueIsEmpty(rawValue: string | null): boolean {
-  if (rawValue == null) {
-    return true;
-  }
-
-  const trimmedValue = rawValue.trim();
-  return trimmedValue === '' || trimmedValue === '\'\'' || trimmedValue === '""';
+  return yamlValueIsEmpty(rawValue);
 }
 
 @RuleBuilder.register

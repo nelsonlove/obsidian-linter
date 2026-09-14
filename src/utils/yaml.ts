@@ -82,6 +82,36 @@ export function getYamlSectionValue(yaml: string, rawKey: string, allowNestedKey
   return result;
 }
 
+/**
+ * Strips one matching pair of surrounding quotes from a frontmatter value, so the value is judged
+ * on its content rather than on its quoting.
+ * @param {string} rawValue The value as it appears after the key's colon.
+ * @return {string} The trimmed value with a single matching pair of quotes removed.
+ */
+export function unquoteYamlValue(rawValue: string): string {
+  const trimmedValue = rawValue.trim();
+  const firstCharacter = trimmedValue[0];
+  if ((firstCharacter === '"' || firstCharacter === '\'') && trimmedValue.endsWith(firstCharacter) && trimmedValue.length > 1) {
+    return trimmedValue.slice(1, -1).trim();
+  }
+
+  return trimmedValue;
+}
+
+/**
+ * True when a frontmatter value carries no content. An absent value, whitespace, and an explicitly
+ * empty string in either quote style all count, since each leaves the key without a usable value.
+ *
+ * Shared deliberately: two rules each needing "is this key really filled in" grew two copies of
+ * this check, and the copies disagreed — one counted `""` as empty and the other did not, so a
+ * quoted-empty key was silently skipped by one rule and filled by the other.
+ * @param {string | null} rawValue The value as returned by `getYamlSectionValue`.
+ * @return {boolean} True when the key has no usable value.
+ */
+export function yamlValueIsEmpty(rawValue: string | null): boolean {
+  return rawValue == null || unquoteYamlValue(rawValue) === '';
+}
+
 export function removeYamlSection(yaml: string, rawKey: string, allowNestedKey: boolean = true): string {
   const result = yaml.replace(getYamlSectionRegExp(rawKey, allowNestedKey), '');
   return result;
