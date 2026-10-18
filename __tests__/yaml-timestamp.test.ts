@@ -622,7 +622,7 @@ ruleTest({
       },
     },
     {
-      testName: 'A quoted date modified value is replaced with the current time when the text was modified',
+      testName: 'A quoted date modified value is replaced with the current time, still quoted, when the text was modified',
       before: dedent`
         ---
         modified: "2026-10-16T09:12:40+00:00"
@@ -630,7 +630,7 @@ ruleTest({
       `,
       after: dedent`
         ---
-        modified: 2026-10-18T06:30:00+00:00
+        modified: "2026-10-18T06:30:00+00:00"
         ---
       `,
       options: {
@@ -641,6 +641,50 @@ ruleTest({
         currentTime: moment('2026-10-18T06:30:00+00:00', 'YYYY-MM-DDTHH:mm:ssZ'),
         alreadyModified: true,
         dateModifiedSourceOfTruth: 'user or Linter edits',
+      },
+    },
+    {
+      testName: 'A quoted date created value whose offset is not the local one is read as that instant when the frontmatter is the source of truth',
+      before: dedent`
+        ---
+        created: "2026-10-16T08:57:06-04:00"
+        ---
+      `,
+      after: dedent`
+        ---
+        created: "2026-10-16T12:57:06+00:00"
+        ---
+      `,
+      options: {
+        dateModified: false,
+        dateCreatedKey: 'created',
+        format: 'YYYY-MM-DD[T]HH:mm:ssZ',
+        fileCreatedTime: '2026-10-16T12:57:06+00:00',
+        currentTime: moment('2026-10-18T06:30:00+00:00', 'YYYY-MM-DDTHH:mm:ssZ'),
+        alreadyModified: false,
+        dateCreatedSourceOfTruth: 'frontmatter',
+      },
+    },
+    {
+      testName: 'A quoted date created value in another format is converted to the set format, still quoted, when the frontmatter is the source of truth',
+      before: dedent`
+        ---
+        created: "2026-10-16 08:57:06"
+        ---
+      `,
+      after: dedent`
+        ---
+        created: "2026-10-16T08:57:06+00:00"
+        ---
+      `,
+      options: {
+        dateModified: false,
+        dateCreatedKey: 'created',
+        format: 'YYYY-MM-DD[T]HH:mm:ssZ',
+        fileCreatedTime: '2026-10-17T00:00:00+00:00',
+        currentTime: moment('2026-10-18T06:30:00+00:00', 'YYYY-MM-DDTHH:mm:ssZ'),
+        alreadyModified: false,
+        dateCreatedSourceOfTruth: 'frontmatter',
       },
     },
   ],
