@@ -112,7 +112,7 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
 
       textModified = true;
     } else if (keyWithValueFound) {
-      const createdDateString = this.getYAMLTimestampString(text, created_match, options.dateCreatedKey);
+      const createdDateString = this.unquoteTimestampIfInFormat(this.getYAMLTimestampString(text, created_match, options.dateCreatedKey), options.format, options.locale);
       const actualFormat = parseFormat(createdDateString);
       if (options.dateCreatedSourceOfTruth == 'frontmatter' && options.format !== actualFormat) {
         const yamlCreatedDateTime = this.parseValueToCurrentFormatIfPossible(createdDateString, options.format, options.locale, options.convertToUTC);
@@ -168,7 +168,7 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
       // due to how moment validation works for formats, we must check if the output string is the same for the provided value since
       // parsing when it has escaped characters in it does not result in a valid value
       // see https://github.com/platers/obsidian-linter/issues/1411
-      const originalString = this.getYAMLTimestampString(text, modified_match, options.dateModifiedKey);
+      const originalString = this.unquoteTimestampIfInFormat(this.getYAMLTimestampString(text, modified_match, options.dateModifiedKey), options.format, options.locale);
       const modifiedDateTime = moment(originalString, options.format, options.locale);
       // conditions when update happens for date modified if the key already exists:
       // 1. the text has been modified
@@ -221,6 +221,33 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
     const match = text.match(matchRegex)[0];
 
     return match.replace(key + ':', '').trim();
+  }
+  /**
+   * A YAML scalar may be quoted (`created: "2020-01-01T00:00:00-05:00"`). When the quoted text is not in the set format but
+   * the text inside the quotes is, the inner text is the value; otherwise the value is returned as it stands. So a quoted
+   * date in the set format is read as that date and kept, and a format that itself contains quotes still matches as before.
+   */
+  unquoteTimestampIfInFormat(value: string, format: string, locale: string): string {
+    if (format === '' || value.length < 2) {
+      return value;
+    }
+
+    const quote = value.charAt(0);
+    if ((quote !== '"' && quote !== '\'') || value.charAt(value.length - 1) !== quote) {
+      return value;
+    }
+
+    const isInFormat = (str: string): boolean => {
+      const date = moment(str, format, locale, true);
+      return date.isValid() && date.format(format) === str;
+    };
+
+    const inner = value.substring(1, value.length - 1);
+    if (!isInFormat(value) && isInFormat(inner)) {
+      return inner;
+    }
+
+    return value;
   }
   getTimeDifferenceInSeconds(modifiedDateTimeMetadata: moment.Moment, yamlModifiedDateTime: moment.Moment, options: YamlTimestampOptions): number {
     // the metadata value may not be in the correct format, so we need to convert it to the correct format
