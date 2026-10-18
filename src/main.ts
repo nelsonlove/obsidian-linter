@@ -911,7 +911,10 @@ export default class LinterPlugin extends Plugin {
           const editorIsWholeFile = editorValue === cachedValue;
 
           let oldText = '';
-          if (editorIsWholeFile) {
+          if (editorIsWholeFile && editorValue.trim() === '') {
+            // never add frontmatter to an empty note from the timer
+            logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped'));
+          } else if (editorIsWholeFile) {
             oldText = editorValue;
 
             let newText = oldText;
@@ -954,9 +957,16 @@ export default class LinterPlugin extends Plugin {
               logInfo(getTextInLanguage('logs.file-change-yaml-lint-run'));
 
               await this.app.vault.process(file, (data: string) => {
+                // lint the file as it is now, not the earlier cached read: the file may have been written since then,
+                // or be empty part way through a write from outside Obsidian, which must not get frontmatter added
+                if (data.trim() === '') {
+                  logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped'));
+                  return data;
+                }
+
                 logInfo(getTextInLanguage('logs.file-change-yaml-lint-run'));
                 try {
-                  return this.rulesRunner.runYAMLTimestampByItself(createRunLinterRulesOptions(oldText, file, this.momentLocale, this.settings, null));
+                  return this.rulesRunner.runYAMLTimestampByItself(createRunLinterRulesOptions(data, file, this.momentLocale, this.settings, null));
                 } catch (error) {
                   this.handleLintError(file, error instanceof Error ? error : new Error(String(error)), getTextInLanguage('commands.lint-file.error-message') + ' \'{FILE_PATH}\'', false);
                   return data;
