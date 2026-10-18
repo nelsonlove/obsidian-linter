@@ -62,6 +62,7 @@ export default {
     'linter-run': 'Running linter',
     'file-change-yaml-lint-run': 'Running editor content change YAML linting',
     'file-change-yaml-lint-skipped': 'No file change detected, so YAML linting skipped',
+    'file-change-yaml-lint-skipped-empty': 'The file is empty, so YAML linting skipped',
     'file-change-yaml-lint-warning': 'No file info is present, but debounce ran. Something went wrong somewhere.',
     'paste-link-warning': 'aborted paste lint as the clipboard content is a link and doing so will avoid conflicts with other plugins that modify pasting.',
     'see-console': 'See console for more details.',
