@@ -880,57 +880,74 @@ export default class LinterPlugin extends Plugin {
         const activeFileChangeInfo = this.activeFileChangeDebouncer.get(file.path);
         activeFileChangeInfo.isRunning = true;
 
-        const editorValue = stripCr(editor.getValue());
-        const cachedValue = stripCr(await this.app.vault.cachedRead(file));
-        const editorIsWholeFile = editorValue === cachedValue;
+        try {
+          const editorValue = stripCr(editor.getValue());
+          const cachedValue = stripCr(await this.app.vault.cachedRead(file));
+          const editorIsWholeFile = editorValue === cachedValue;
 
-        let oldText = '';
-        if (editorIsWholeFile) {
-          oldText = editorValue;
+          let oldText = '';
+          if (editorIsWholeFile && editorValue.trim() === '') {
+            // never add frontmatter to an empty note from the timer
+            logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped-empty'));
+          } else if (editorIsWholeFile) {
+            oldText = editorValue;
 
-          let newText: string;
-          if (oldText != activeFileChangeInfo.originalText) {
-            logInfo(getTextInLanguage('logs.file-change-yaml-lint-run'));
-            try {
-              newText = this.rulesRunner.runYAMLTimestampByItself(createRunLinterRulesOptions(oldText, file, this.momentLocale, this.settings, null));
-            } catch (error) {
-              this.handleLintError(file, error instanceof Error ? error : new Error(String(error)), getTextInLanguage('commands.lint-file.error-message') + ' \'{FILE_PATH}\'', false);
-              return;
-            }
-
-            if (activeFileChangeInfo.markdownInfo instanceof MarkdownView) {
-              const markdownInfo = activeFileChangeInfo.markdownInfo;
-              const state = markdownInfo.getState();
-              if (state.mode === "source") {
-                this.updateEditor(oldText, newText, editor);
-              } else {
-                await this.app.vault.process(file, () => newText);
-              }
-            }
-          } else {
-            logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped'));
-          }
-        } else {
-          oldText = cachedValue;
-          if (oldText != activeFileChangeInfo.originalText) {
-            logInfo(getTextInLanguage('logs.file-change-yaml-lint-run'));
-
-            await this.app.vault.process(file, (data: string) => {
+            let newText: string;
+            if (oldText != activeFileChangeInfo.originalText) {
               logInfo(getTextInLanguage('logs.file-change-yaml-lint-run'));
               try {
-                return this.rulesRunner.runYAMLTimestampByItself(createRunLinterRulesOptions(oldText, file, this.momentLocale, this.settings, null));
+                newText = this.rulesRunner.runYAMLTimestampByItself(createRunLinterRulesOptions(oldText, file, this.momentLocale, this.settings, null));
               } catch (error) {
                 this.handleLintError(file, error instanceof Error ? error : new Error(String(error)), getTextInLanguage('commands.lint-file.error-message') + ' \'{FILE_PATH}\'', false);
-                return data;
+                return;
               }
-            });
-          } else {
-            logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped'));
-          }
-        }
 
-        this.activeFileChangeDebouncer.delete(file.path);
-        activeFileChangeInfo.isRunning = false;
+              if (activeFileChangeInfo.markdownInfo instanceof MarkdownView) {
+                const markdownInfo = activeFileChangeInfo.markdownInfo;
+                const state = markdownInfo.getState();
+                if (state.mode === "source") {
+                  this.updateEditor(oldText, newText, editor);
+                } else {
+                  // write only when the file is still the text that was linted
+                  await this.app.vault.process(file, (data: string) => stripCr(data) === oldText ? newText : data);
+                }
+              }
+            } else {
+              logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped'));
+            }
+          } else {
+            oldText = cachedValue;
+            if (oldText != activeFileChangeInfo.originalText) {
+              await this.app.vault.process(file, (data: string) => {
+                // lint the file as it is now, not the earlier cached read: the file may have been written since then,
+                // or be empty part way through a write from outside Obsidian, which must not get frontmatter added
+                if (data.trim() === '') {
+                  logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped-empty'));
+                  return data;
+                }
+
+                if (stripCr(data) === stripCr(activeFileChangeInfo.originalText)) {
+                  logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped'));
+                  return data;
+                }
+
+                logInfo(getTextInLanguage('logs.file-change-yaml-lint-run'));
+                try {
+                  return this.rulesRunner.runYAMLTimestampByItself(createRunLinterRulesOptions(data, file, this.momentLocale, this.settings, null));
+                } catch (error) {
+                  this.handleLintError(file, error instanceof Error ? error : new Error(String(error)), getTextInLanguage('commands.lint-file.error-message') + ' \'{FILE_PATH}\'', false);
+                  return data;
+                }
+              });
+            } else {
+              logInfo(getTextInLanguage('logs.file-change-yaml-lint-skipped'));
+            }
+          }
+        } finally {
+          // clear the entry on every path, or the timer never runs for this file again
+          this.activeFileChangeDebouncer.delete(file.path);
+          activeFileChangeInfo.isRunning = false;
+        }
       },
       delay,
       true,
