@@ -687,5 +687,27 @@ ruleTest({
         dateCreatedSourceOfTruth: 'frontmatter',
       },
     },
+    {
+      testName: 'A quoted empty date created value is filled, still quoted, when the frontmatter is the source of truth',
+      before: dedent`
+        ---
+        created: ""
+        ---
+      `,
+      after: dedent`
+        ---
+        created: "2026-10-16T08:57:06+00:00"
+        ---
+      `,
+      options: {
+        dateModified: false,
+        dateCreatedKey: 'created',
+        format: 'YYYY-MM-DD[T]HH:mm:ssZ',
+        fileCreatedTime: '2026-10-16T08:57:06+00:00',
+        currentTime: moment('2026-10-18T06:30:00+00:00', 'YYYY-MM-DDTHH:mm:ssZ'),
+        alreadyModified: false,
+        dateCreatedSourceOfTruth: 'frontmatter',
+      },
+    },
   ],
 });
