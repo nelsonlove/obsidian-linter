@@ -26,7 +26,7 @@ type PluginUnderTest = {
   [member: string]: unknown;
 };
 
-function setUpPlugin(cachedText: string, editorText: string, lint: (text: string) => string) {
+function setUpPlugin(cachedText: string, editorText: string, lint: (text: string) => string, originalText = 'text when the timer started') {
   const plugin = Object.create(LinterPlugin.prototype) as PluginUnderTest;
   const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as typeof DEFAULT_SETTINGS;
   settings.ruleConfigs['yaml-timestamp'] = {'update-on-file-contents-updated': 'after 5 seconds'};
@@ -44,7 +44,8 @@ function setUpPlugin(cachedText: string, editorText: string, lint: (text: string
       },
     },
   };
-  plugin.activeFileChangeDebouncer = new Map([[file.path, {originalText: 'text when the timer started', isRunning: false}]]);
+  plugin.handleLintError = jest.fn();
+  plugin.activeFileChangeDebouncer = new Map([[file.path, {originalText: originalText, isRunning: false}]]);
 
   const editor = {getValue: () => editorText};
   return {plugin, file, editor, processCalls};
@@ -83,5 +84,30 @@ describe('yaml-timestamp update after a file change', () => {
     expect(lint).not.toHaveBeenCalled();
     expect(plugin.updateEditor).not.toHaveBeenCalled();
     expect(processCalls).toHaveLength(0);
+  });
+
+  it('writes nothing new when the file on disk is back to the text it had when the timer started', async () => {
+    const lint = jest.fn((text: string) => `linted(${text})`);
+    const {plugin, file, editor, processCalls} = setUpPlugin('stale cached text', 'editor text', lint, 'original text');
+
+    await plugin.createDebouncedFileUpdate()(file, editor);
+
+    expect(processCalls[0]('original text')).toBe('original text');
+    expect(lint).not.toHaveBeenCalled();
+  });
+
+  it('clears the file\'s timer entry when the rule throws in the editor branch, so the timer can run again', async () => {
+    const lint = () => {
+      throw new Error('invalid date');
+    };
+    const {plugin, file, editor} = setUpPlugin('changed text', 'changed text', lint);
+    const debouncer = plugin.activeFileChangeDebouncer as Map<string, {isRunning: boolean}>;
+    const info = debouncer.get(file.path);
+
+    await plugin.createDebouncedFileUpdate()(file, editor);
+
+    expect(plugin.handleLintError).toHaveBeenCalled();
+    expect(debouncer.has(file.path)).toBe(false);
+    expect(info.isRunning).toBe(false);
   });
 });
