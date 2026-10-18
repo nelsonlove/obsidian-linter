@@ -1,7 +1,7 @@
 import {Options, RuleType} from '../rules';
 import RuleBuilder, {BooleanOptionBuilder, DropdownOptionBuilder, ExampleBuilder, MomentFormatOptionBuilder, OptionBuilderBase, TextOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
-import {formatYAML, initYAML} from '../utils/yaml';
+import {formatYAML, initYAML, isValueEscapedAlready} from '../utils/yaml';
 import {moment} from 'obsidian';
 import {escapeDollarSigns} from '../utils/regex';
 import {insert} from '../utils/strings';
@@ -92,7 +92,7 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
     created_date.locale(options.locale);
 
     const formatted_date = options.convertToUTC ? created_date.utc().format(options.format) : created_date.format(options.format);
-    const created_date_line = `\n${options.dateCreatedKey}: ${formatted_date}`;
+    const created_date_line = this.timestampLine(options.dateCreatedKey, formatted_date);
 
     const keyWithValueFound = created_match.test(text);
     if (!keyWithValueFound && created_key_match.test(text)) {
@@ -112,9 +112,17 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
 
       textModified = true;
     } else if (keyWithValueFound) {
-      const createdDateString = this.getYAMLTimestampString(text, created_match, options.dateCreatedKey);
+      const [createdDateString, createdQuote] = this.splitTimestampQuote(this.getYAMLTimestampString(text, created_match, options.dateCreatedKey), options.format);
       const actualFormat = parseFormat(createdDateString);
-      if (options.dateCreatedSourceOfTruth == 'frontmatter' && options.format !== actualFormat) {
+      if (createdDateString === '') {
+        // a quoted empty value (`created: ""`) has no date in it, so it is filled like a key with no value
+        text = text.replace(
+            created_match,
+            escapeDollarSigns(this.timestampLine(options.dateCreatedKey, formatted_date, createdQuote)) + '\n',
+        );
+
+        textModified = true;
+      } else if (options.dateCreatedSourceOfTruth == 'frontmatter' && options.format !== actualFormat) {
         const yamlCreatedDateTime = this.parseValueToCurrentFormatIfPossible(createdDateString, options.format, options.locale, options.convertToUTC);
         if (yamlCreatedDateTime == null) {
           throw new Error(getTextInLanguage('logs.invalid-date-format-error').replace('{DATE}', createdDateString).replace('{FILE_NAME}', options.fileName));
@@ -123,7 +131,7 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
         const formattedYamlCreatedDate = options.convertToUTC ? yamlCreatedDateTime.utc().format(options.format) : yamlCreatedDateTime.format(options.format);
 
         if (formattedYamlCreatedDate !== createdDateString) {
-          const created_date_yaml_line = `\n${options.dateCreatedKey}: ${formattedYamlCreatedDate}`;
+          const created_date_yaml_line = this.timestampLine(options.dateCreatedKey, formattedYamlCreatedDate, createdQuote);
           text = text.replace(
               created_match,
               escapeDollarSigns(created_date_yaml_line) + '\n',
@@ -140,7 +148,7 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
         if (createdDateTime == undefined || !createdDateTime.isValid() || (options.format !== '' && createdDateTime.format(options.format) != createdDateString)) {
           text = text.replace(
               created_match,
-              escapeDollarSigns(created_date_line) + '\n',
+              escapeDollarSigns(this.timestampLine(options.dateCreatedKey, formatted_date, createdQuote)) + '\n',
           );
 
           textModified = true;
@@ -161,14 +169,14 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
     // using the current time helps prevent issues where the previous modified time was greater
     // than 5 seconds prior to the time the linter will finish with the file (i.e. helps prevent accidental infinite loops on updating the date modified value)
     const formatted_modified_date = options.convertToUTC ? options.currentTime.utc().format(options.format) : options.currentTime.format(options.format);
-    const modified_date_line = `\n${options.dateModifiedKey}: ${formatted_modified_date}`;
+    const modified_date_line = this.timestampLine(options.dateModifiedKey, formatted_modified_date);
 
     const keyWithValueFound = modified_match.test(text);
     if (keyWithValueFound) {
       // due to how moment validation works for formats, we must check if the output string is the same for the provided value since
       // parsing when it has escaped characters in it does not result in a valid value
       // see https://github.com/platers/obsidian-linter/issues/1411
-      const originalString = this.getYAMLTimestampString(text, modified_match, options.dateModifiedKey);
+      const [originalString, modifiedQuote] = this.splitTimestampQuote(this.getYAMLTimestampString(text, modified_match, options.dateModifiedKey), options.format);
       const modifiedDateTime = moment(originalString, options.format, options.locale);
       // conditions when update happens for date modified if the key already exists:
       // 1. the text has been modified
@@ -181,7 +189,7 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
       ) {
         text = text.replace(
             modified_match,
-            escapeDollarSigns(modified_date_line) + '\n',
+            escapeDollarSigns(this.timestampLine(options.dateModifiedKey, formatted_modified_date, modifiedQuote)) + '\n',
         );
       }
     } else if (modified_key_match.test(text)) {
@@ -221,6 +229,27 @@ export default class YamlTimestamp extends RuleBuilder<YamlTimestampOptions> {
     const match = text.match(matchRegex)[0];
 
     return match.replace(key + ':', '').trim();
+  }
+  /**
+   * A YAML scalar may be quoted (`created: "2020-01-01T00:00:00-05:00"`). Quotes are YAML's, not part of the date, unless the
+   * set format writes that quote character itself (see https://github.com/platers/obsidian-linter/issues/1411). YAML's quotes
+   * are split off, and the quote character is returned so that a rewrite keeps the quoting. A value with a quote character or a
+   * backslash inside is left whole, since it may hold YAML escapes that a plain split would get wrong.
+   */
+  splitTimestampQuote(value: string, format: string): [string, string] {
+    if (format === '' || !isValueEscapedAlready(value) || format.includes(value.charAt(0))) {
+      return [value, ''];
+    }
+
+    const inner = value.substring(1, value.length - 1);
+    if (/['"\\]/.test(inner)) {
+      return [value, ''];
+    }
+
+    return [inner, value.charAt(0)];
+  }
+  timestampLine(key: string, value: string, quote: string = ''): string {
+    return `\n${key}: ${quote}${value}${quote}`;
   }
   getTimeDifferenceInSeconds(modifiedDateTimeMetadata: moment.Moment, yamlModifiedDateTime: moment.Moment, options: YamlTimestampOptions): number {
     // the metadata value may not be in the correct format, so we need to convert it to the correct format
