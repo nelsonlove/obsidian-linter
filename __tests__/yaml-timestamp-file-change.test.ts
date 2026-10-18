@@ -10,7 +10,8 @@ jest.mock('obsidian', () => {
     debounce: (fn: (...args: unknown[]) => unknown) => fn,
   };
   return new Proxy(known, {
-    get: (target, prop: string) => prop in target ? target[prop] : class {},
+    // 'then' and symbol keys stay undefined, so the module is never taken for a promise
+    get: (target, prop: string | symbol) => typeof prop === 'symbol' || prop === 'then' ? undefined : prop in target ? target[prop] : class {},
   });
 });
 
@@ -107,6 +108,18 @@ describe('yaml-timestamp update after a file change', () => {
     await plugin.createDebouncedFileUpdate()(file, editor);
 
     expect(plugin.handleLintError).toHaveBeenCalled();
+    expect(debouncer.has(file.path)).toBe(false);
+    expect(info.isRunning).toBe(false);
+  });
+
+  it('clears the file\'s timer entry when vault.process rejects, so the timer can run again', async () => {
+    const {plugin, file, editor} = setUpPlugin('stale cached text', 'editor text', (text: string) => text);
+    (plugin.app as {vault: {process: () => Promise<void>}}).vault.process = () => Promise.reject(new Error('file was renamed'));
+    const debouncer = plugin.activeFileChangeDebouncer as Map<string, {isRunning: boolean}>;
+    const info = debouncer.get(file.path);
+
+    await expect(plugin.createDebouncedFileUpdate()(file, editor)).rejects.toThrow('file was renamed');
+
     expect(debouncer.has(file.path)).toBe(false);
     expect(info.isRunning).toBe(false);
   });
